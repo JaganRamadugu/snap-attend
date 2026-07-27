@@ -452,7 +452,7 @@ def render_reports_view():
         
     st.write("")
     
-    csv = df_logs.to_csv(index=False).encode('utf-8')
+    csv = b'\xef\xbb\xbf' + df_logs.to_csv(index=False).encode('utf-8')
     st.download_button(
         label="📥 Export Report as CSV",
         data=csv,
