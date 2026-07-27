@@ -420,7 +420,14 @@ def render_reports_view():
         return
         
     log_data = []
-    for log in logs:
+    present_logs = []
+    
+    # Sort logs by timestamp descending so latest is on top
+    sorted_logs = sorted(logs, key=lambda x: x.get('timestamp', ''), reverse=True)
+    
+    for log in sorted_logs:
+        if not log['is_present']:
+            continue
         s_id = log['student_id']
         s_name = student_map.get(s_id, f"Unknown Student (ID: {s_id})")
         
@@ -433,16 +440,16 @@ def render_reports_view():
             
         log_data.append({
             'Timestamp': formatted_time,
-            'Student ID': s_id,
-            'Student Name': s_name,
-            'Status': '✅ Present' if log['is_present'] else '❌ Absent'
+            'Student ID': str(s_id), # Represent as string so table formats it without formatting
+            'Student Name': s_name
         })
+        present_logs.append(log)
         
     df_logs = pd.DataFrame(log_data)
     
     col_total, col_present_rate = st.columns(2)
-    total_records = len(df_logs)
-    present_records = sum(1 for l in log_data if 'Present' in l['Status'])
+    total_records = len(logs)
+    present_records = len(present_logs)
     overall_rate = (present_records / total_records) * 100 if total_records else 0
     
     with col_total:
@@ -452,17 +459,35 @@ def render_reports_view():
         
     st.write("")
     
-    csv = b'\xef\xbb\xbf' + df_logs.to_csv(index=False).encode('utf-8')
+    # Construct Plain Text File report content
+    report_lines = []
+    report_lines.append("=========================================")
+    report_lines.append("       SNAP ATTEND - PRESENT STUDENTS    ")
+    report_lines.append("=========================================")
+    report_lines.append(f"Class: {selected_sub_label}")
+    report_lines.append(f"Total Present Records: {len(present_logs)}")
+    report_lines.append("-----------------------------------------")
+    report_lines.append(f"{'Timestamp':19} | {'Student ID':15} | {'Student Name'}")
+    report_lines.append("-----------------------------------------")
+    
+    for entry in log_data:
+        report_lines.append(f"{entry['Timestamp']:19} | {entry['Student ID']:15} | {entry['Student Name']}")
+        
+    report_text = "\n".join(report_lines)
+    
     st.download_button(
-        label="📥 Export Report as CSV",
-        data=csv,
-        file_name=f"attendance_report_{subject_id}.csv",
-        mime="text/csv",
+        label="📥 Export Present Students as TXT",
+        data=report_text,
+        file_name=f"present_students_{subject_id}.txt",
+        mime="text/plain",
         width="stretch"
     )
     
     st.write("")
-    st.dataframe(df_logs, width="stretch", hide_index=True)
+    if not df_logs.empty:
+        st.dataframe(df_logs, width="stretch", hide_index=True)
+    else:
+        st.info("No present records found in logs.")
 
 def render_auth_flow():
     _, col_form, _ = st.columns([1, 3.5, 1])
