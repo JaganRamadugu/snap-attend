@@ -259,25 +259,20 @@ def cleanup_old_uploads():
             except Exception:
                 pass
 
-def save_uploaded_image(img_file):
+def save_photo_to_disk(photo_bytes, photo_name):
     uploads_dir = "uploads"
     if not os.path.exists(uploads_dir):
         os.makedirs(uploads_dir, exist_ok=True)
     try:
-        # Generate clean timestamped filename
-        suffix = img_file.name if hasattr(img_file, "name") and img_file.name else "camera.jpg"
         # Sanitize filename
-        safe_suffix = "".join(c for c in suffix if c.isalnum() or c in (".", "_", "-"))
+        safe_suffix = "".join(c for c in photo_name if c.isalnum() or c in (".", "_", "-"))
         filename = f"att_{int(time.time())}_{safe_suffix}"
         file_path = os.path.join(uploads_dir, filename)
-        
-        # Save file to disk
-        img_file.seek(0)
         with open(file_path, "wb") as f:
-            f.write(img_file.read())
-        img_file.seek(0)  # reset for subsequent PIL read
+            f.write(photo_bytes)
+        return file_path
     except Exception:
-        pass
+        return None
 
 def render_scanner_view():
     cleanup_old_uploads()
@@ -285,9 +280,20 @@ def render_scanner_view():
     teacher_id = teacher.get('teacher_id')
     
     st.markdown('<h2 style="text-align: center; font-weight: 800; color: #0E1428; margin-top: 15px; margin-bottom: 5px;">AI Attendance Scanner</h2>', unsafe_allow_html=True)
-    st.markdown('<p style="text-align: center; color: #7B9E89; margin-bottom: 25px;">Take or upload a class photo to automatically register attendance</p>', unsafe_allow_html=True)
+    st.markdown('<p style="text-align: center; color: #7B9E89; margin-bottom: 25px;">Take or upload up to 3 class photos to automatically register attendance</p>', unsafe_allow_html=True)
     
+    # Initialize session state for multi-photo list
+    if 'scanner_photos' not in st.session_state:
+        st.session_state['scanner_photos'] = []
+    if 'detection_results' not in st.session_state:
+        st.session_state['detection_results'] = None
+    if 'saved_disk_paths' not in st.session_state:
+        st.session_state['saved_disk_paths'] = []
+
     if st.button("⬅ Back to Dashboard", key="back_from_scanner", type="secondary"):
+        st.session_state['scanner_photos'] = []
+        st.session_state['detection_results'] = None
+        st.session_state['saved_disk_paths'] = []
         st.session_state['teacher_view'] = 'dashboard'
         st.rerun()
         
@@ -302,91 +308,172 @@ def render_scanner_view():
     selected_sub_label = st.selectbox("Select Class/Subject", list(subject_options.keys()))
     subject_id = subject_options[selected_sub_label]
     
-    st.markdown("<h4 style='color: #0E1428; font-weight: 700;'>📸 Class Group Photo</h4>", unsafe_allow_html=True)
+    # Render Photo Gallery
+    st.markdown("<h4 style='color: #0E1428; font-weight: 700; margin-top: 20px;'>📷 Active Photos (Up to 3)</h4>", unsafe_allow_html=True)
     
-    tab_camera, tab_upload = st.tabs(["📷 Use Camera Input", "📤 Upload Photo File"])
-    img_file = None
-    
-    with tab_camera:
-        cam_file = st.camera_input("Capture Group Image", label_visibility="collapsed")
-        if cam_file:
-            img_file = cam_file
-            
-    with tab_upload:
-        uploaded_file = st.file_uploader("Upload a group photo...", type=["jpg", "jpeg", "png"], label_visibility="collapsed")
-        if uploaded_file:
-            if uploaded_file.size > 50 * 1024 * 1024:
-                st.error("❌ File size exceeds the 50MB limit.")
-            else:
-                img_file = uploaded_file
-            
-    if img_file:
-        save_uploaded_image(img_file)
-        image = Image.open(img_file)
-        image_np = np.array(image.convert("RGB"))
+    if len(st.session_state['scanner_photos']) == 0:
+        st.info("No photos added yet. Add photos below using your webcam or file upload.")
+    else:
+        # Display columns of added photos
+        cols = st.columns(3)
+        for i, photo in enumerate(st.session_state['scanner_photos']):
+            with cols[i]:
+                try:
+                    img = Image.open(io.BytesIO(photo['data']))
+                    st.image(img, caption=photo['name'], use_container_width=True)
+                except Exception:
+                    st.error("Failed to render preview.")
+                
+                if st.button(f"🗑️ Remove Photo {i+1}", key=f"btn_remove_{i}", type="secondary", width="stretch"):
+                    st.session_state['scanner_photos'].pop(i)
+                    st.session_state['detection_results'] = None
+                    st.rerun()
+
+    # Show adding options if less than 3
+    if len(st.session_state['scanner_photos']) < 3:
+        st.markdown("<h4 style='color: #0E1428; font-weight: 700; margin-top: 20px;'>➕ Add Photo</h4>", unsafe_allow_html=True)
+        tab_camera, tab_upload = st.tabs(["📷 Use Camera Input", "📤 Upload Photo File"])
         
-        with st.spinner("Analyzing class photo using AI Face Pipeline..."):
-            try:
-                # Run prediction
-                detected, all_registered_ids, num_faces = predict_attendance(image_np, subject_id=subject_id)
-                
-                # Fetch only students enrolled in this subject
-                students = get_students_by_subject(subject_id)
-                student_map = {s['student_id']: s for s in students}
-                
-                st.write("")
-                st.markdown(f"### 📊 Scan Results (Detected {num_faces} faces)")
-                
-                if not students:
-                    st.info("No registered students found in the database. Go to Student Portal to register student profiles first.")
-                    return
-                
-                # We want to display the attendance list
-                attendance_list = []
-                for s_id, student in student_map.items():
-                    is_present = detected.get(s_id, False)
-                    attendance_list.append({
-                        'student_id': s_id,
-                        'name': student['name'],
-                        'status': '✅ Present' if is_present else '❌ Absent',
-                        'is_present': is_present
-                    })
-                
-                df_att = pd.DataFrame(attendance_list)
-                
-                col_table, col_summary = st.columns([2, 1])
-                
-                with col_table:
-                    st.dataframe(
-                        df_att[['student_id', 'name', 'status']], 
-                        width="stretch", 
-                        hide_index=True
-                    )
+        with tab_camera:
+            cam_file = st.camera_input("Capture Group Image", key=f"cam_input_{len(st.session_state['scanner_photos'])}", label_visibility="collapsed")
+            if cam_file:
+                if st.button("➕ Add Captured Photo", key="btn_add_cam", type="primary", width="stretch"):
+                    photo_bytes = cam_file.getvalue()
+                    name = f"camera_capture_{len(st.session_state['scanner_photos']) + 1}.jpg"
+                    st.session_state['scanner_photos'].append({'name': name, 'data': photo_bytes})
+                    st.session_state['detection_results'] = None
+                    st.rerun()
                     
-                with col_summary:
-                    present_count = sum(1 for a in attendance_list if a['is_present'])
-                    absent_count = len(attendance_list) - present_count
-                    rate = (present_count / len(attendance_list)) * 100 if attendance_list else 0
+        with tab_upload:
+            uploaded_files = st.file_uploader("Upload class photos...", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key=f"upload_input_{len(st.session_state['scanner_photos'])}", label_visibility="collapsed")
+            if uploaded_files:
+                if st.button("➕ Add Uploaded Photos", key="btn_add_upload", type="primary", width="stretch"):
+                    added = False
+                    for uf in uploaded_files:
+                        if len(st.session_state['scanner_photos']) >= 3:
+                            st.warning("Maximum of 3 photos reached. Skipping remaining files.")
+                            break
+                        if uf.size > 50 * 1024 * 1024:
+                            st.error(f"❌ {uf.name} exceeds the 50MB limit.")
+                            continue
+                        
+                        if not any(p['name'] == uf.name for p in st.session_state['scanner_photos']):
+                            st.session_state['scanner_photos'].append({'name': uf.name, 'data': uf.getvalue()})
+                            added = True
+                    if added:
+                        st.session_state['detection_results'] = None
+                        st.rerun()
+
+    # Trigger detection
+    if len(st.session_state['scanner_photos']) > 0:
+        st.write("")
+        if st.button("🔍 Run AI Attendance Detection", key="btn_run_detection", type="primary", width="stretch"):
+            with st.spinner("Analyzing class photos using AI Face Pipeline..."):
+                try:
+                    detected_union = {}
+                    total_faces = 0
+                    saved_paths = []
                     
-                    st.markdown(f"""
-                    <div style="background-color: #FFFFFF; border-radius: 16px; padding: 20px; border: 1px solid #7B9E89; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
-                        <h4 style="color: #0E1428; margin-top: 0;">Summary</h4>
-                        <p style="font-size: 1.1rem; margin-bottom: 5px;"><b>Total Students:</b> {len(attendance_list)}</p>
-                        <p style="font-size: 1.1rem; margin-bottom: 5px; color: green;"><b>Present:</b> {present_count}</p>
-                        <p style="font-size: 1.1rem; margin-bottom: 5px; color: red;"><b>Absent:</b> {absent_count}</p>
-                        <p style="font-size: 1.2rem; font-weight: 700; margin-top: 15px; color: #F18805;">Attendance: {rate:.1f}%</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-                
-                st.write("")
-                if st.button("💾 Save & Log Attendance", type="primary", width="stretch"):
-                    with st.spinner("Saving logs to database..."):
-                        for item in attendance_list:
-                            log_attendance(item['student_id'], subject_id, item['is_present'])
-                        st.success(f"Attendance logged successfully for class '{selected_sub_label}'!")
-                        st.balloons()
-            except Exception as e:
-                st.error(f"Error executing AI Attendance pipeline: {e}")
+                    for photo in st.session_state['scanner_photos']:
+                        path = save_photo_to_disk(photo['data'], photo['name'])
+                        if path:
+                            saved_paths.append(path)
+                        
+                        img = Image.open(io.BytesIO(photo['data']))
+                        image_np = np.array(img.convert("RGB"))
+                        
+                        detected, _, num_faces = predict_attendance(image_np, subject_id=subject_id)
+                        
+                        for s_id, present in detected.items():
+                            if present:
+                                detected_union[s_id] = True
+                        total_faces += num_faces
+                        
+                    st.session_state['saved_disk_paths'] = saved_paths
+                    st.session_state['detection_results'] = {
+                        'detected': detected_union,
+                        'num_faces': total_faces
+                    }
+                    st.success("Analysis complete!")
+                except Exception as e:
+                    st.error(f"Error executing AI Attendance pipeline: {e}")
+
+    # Display results
+    if st.session_state.get('detection_results') is not None:
+        results = st.session_state['detection_results']
+        detected = results['detected']
+        num_faces = results['num_faces']
+        
+        students = get_students_by_subject(subject_id)
+        student_map = {s['student_id']: s for s in students}
+        
+        st.write("")
+        st.markdown(f"### 📊 Scan Results (Detected {num_faces} total faces across all photos)")
+        
+        if not students:
+            st.info("No registered students found in the database for this subject. Go to Student Portal to register student profiles first.")
+            return
+            
+        attendance_list = []
+        for s_id, student in student_map.items():
+            is_present = detected.get(s_id, False)
+            attendance_list.append({
+                'student_id': s_id,
+                'name': student['name'],
+                'status': '✅ Present' if is_present else '❌ Absent',
+                'is_present': is_present
+            })
+            
+        df_att = pd.DataFrame(attendance_list)
+        
+        col_table, col_summary = st.columns([2, 1])
+        
+        with col_table:
+            st.dataframe(
+                df_att[['student_id', 'name', 'status']], 
+                width="stretch", 
+                hide_index=True
+            )
+            
+        with col_summary:
+            present_count = sum(1 for a in attendance_list if a['is_present'])
+            absent_count = len(attendance_list) - present_count
+            rate = (present_count / len(attendance_list)) * 100 if attendance_list else 0
+            
+            st.markdown(f"""
+            <div style="background-color: #FFFFFF; border-radius: 16px; padding: 20px; border: 1px solid #7B9E89; box-shadow: 0 4px 10px rgba(0,0,0,0.05);">
+                <h4 style="color: #0E1428; margin-top: 0;">Summary</h4>
+                <p style="font-size: 1.1rem; margin-bottom: 5px;"><b>Total Students:</b> {len(attendance_list)}</p>
+                <p style="font-size: 1.1rem; margin-bottom: 5px; color: green;"><b>Present:</b> {present_count}</p>
+                <p style="font-size: 1.1rem; margin-bottom: 5px; color: red;"><b>Absent:</b> {absent_count}</p>
+                <p style="font-size: 1.2rem; font-weight: 700; margin-top: 15px; color: #F18805;">Attendance: {rate:.1f}%</p>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        st.write("")
+        if st.button("💾 Save & Log Attendance", type="primary", width="stretch"):
+            with st.spinner("Saving logs to database..."):
+                try:
+                    for item in attendance_list:
+                        log_attendance(item['student_id'], subject_id, item['is_present'])
+                    
+                    for path in st.session_state.get('saved_disk_paths', []):
+                        if os.path.exists(path):
+                            try:
+                                os.remove(path)
+                            except Exception:
+                                pass
+                                
+                    st.session_state['scanner_photos'] = []
+                    st.session_state['detection_results'] = None
+                    st.session_state['saved_disk_paths'] = []
+                    
+                    st.success(f"Attendance logged successfully for class '{selected_sub_label}'! All temporary images have been deleted.")
+                    st.balloons()
+                    time.sleep(2)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to log attendance: {e}")
 
 def render_reports_view():
     teacher = st.session_state.get('teacher_user', {})
