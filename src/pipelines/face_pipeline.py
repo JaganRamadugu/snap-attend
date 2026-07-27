@@ -5,7 +5,7 @@ from face_recognition_models import face_recognition_model_location
 from sklearn.svm import SVC
 import streamlit as st
 
-from src.database.db import get_all_students
+from src.database.db import get_all_students, get_students_by_subject
 
 @st.cache_resource
 def load_dlib_models():
@@ -68,18 +68,29 @@ def train_classifier():
     model_data = get_trained_model()
     return bool(model_data)
 
-def predict_attendance(class_image_np):
+def predict_attendance(class_image_np, subject_id=None):
     encodings = get_face_embeddings(class_image_np)
 
     detected_student = {}
 
-    model_data = get_trained_model()
+    if subject_id is not None:
+        students = get_students_by_subject(subject_id)
+        X = []
+        y = []
+        for student in students:
+            embedding = student.get('face_embedding')
+            if embedding:
+                X.append(np.array(embedding))
+                y.append(student.get('student_id'))
+    else:
+        model_data = get_trained_model()
+        if not model_data:
+            return detected_student, [], len(encodings)
+        X = model_data['X']
+        y = model_data['y']
 
-    if not model_data:
+    if not X:
         return detected_student, [], len(encodings)
-
-    X = model_data['X']
-    y = model_data['y']
 
     all_students = sorted(list(set(y)))
 

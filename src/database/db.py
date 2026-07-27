@@ -95,5 +95,13 @@ def is_student_enrolled(student_id, subject_id):
     response = supabase.table('subject_students').select('*').eq('student_id', student_id).eq('subject_id', subject_id).execute()
     return len(response.data) > 0
 
+def get_students_by_subject(subject_id):
+    response = supabase.table('subject_students').select('student_id, students(*)').eq('subject_id', subject_id).execute()
+    students = []
+    for item in response.data:
+        if item.get('students'):
+            students.append(item['students'])
+    return students
+
 
 

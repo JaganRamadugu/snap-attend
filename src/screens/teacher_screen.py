@@ -16,7 +16,7 @@ from src.database.db import (
     get_subjects_by_teacher, 
     log_attendance, 
     get_attendance_reports, 
-    get_all_students
+    get_students_by_subject
 )
 from src.pipelines.face_pipeline import predict_attendance
 
@@ -328,10 +328,10 @@ def render_scanner_view():
         with st.spinner("Analyzing class photo using AI Face Pipeline..."):
             try:
                 # Run prediction
-                detected, all_registered_ids, num_faces = predict_attendance(image_np)
+                detected, all_registered_ids, num_faces = predict_attendance(image_np, subject_id=subject_id)
                 
-                # Fetch all registered students
-                students = get_all_students()
+                # Fetch only students enrolled in this subject
+                students = get_students_by_subject(subject_id)
                 student_map = {s['student_id']: s for s in students}
                 
                 st.write("")
@@ -412,7 +412,7 @@ def render_reports_view():
     
     with st.spinner("Fetching logs..."):
         logs = get_attendance_reports(subject_id)
-        students = get_all_students()
+        students = get_students_by_subject(subject_id)
         student_map = {s['student_id']: s['name'] for s in students}
         
     if not logs:
