@@ -77,6 +77,14 @@ def get_attendance_reports(subject_id):
     response = supabase.table('attendance_logs').select('*').eq('subject_id', subject_id).execute()
     return response.data
 
+def delete_attendance_logs(log_ids):
+    response = supabase.table('attendance_logs').delete().in_('id', log_ids).execute()
+    return response.data
+
+def clear_attendance_logs_by_subject(subject_id):
+    response = supabase.table('attendance_logs').delete().eq('subject_id', subject_id).execute()
+    return response.data
+
 def get_subject_by_id(subject_id):
     response = supabase.table('subjects').select('*').eq('subject_id', subject_id).execute()
     if response.data:

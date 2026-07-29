@@ -16,7 +16,9 @@ from src.database.db import (
     get_subjects_by_teacher, 
     log_attendance, 
     get_attendance_reports, 
-    get_students_by_subject
+    get_students_by_subject,
+    delete_attendance_logs,
+    clear_attendance_logs_by_subject
 )
 from src.pipelines.face_pipeline import predict_attendance
 
@@ -575,6 +577,58 @@ def render_reports_view():
         st.dataframe(df_logs, width="stretch", hide_index=True)
     else:
         st.info("No present records found in logs.")
+
+    st.write("")
+    with st.expander("🗑️ Delete & Manage Logs"):
+        st.markdown("#### Delete Specific Logs")
+        options = []
+        option_to_id = {}
+        for log in sorted_logs:
+            s_id = log['student_id']
+            s_name = student_map.get(s_id, f"Unknown Student (ID: {s_id})")
+            from datetime import datetime
+            try:
+                dt = datetime.fromisoformat(log['timestamp'].replace("Z", "+00:00"))
+                formatted_time = dt.strftime("%Y-%m-%d %H:%M:%S")
+            except Exception:
+                formatted_time = log['timestamp']
+            
+            status_emoji = "✅ Present" if log['is_present'] else "❌ Absent"
+            label = f"{formatted_time} - {s_name} (ID: {s_id}) [{status_emoji}]"
+            options.append(label)
+            option_to_id[label] = log['id']
+            
+        selected_labels = st.multiselect(
+            "Select logs to delete:",
+            options=options,
+            key="delete_logs_multiselect"
+        )
+        
+        if selected_labels:
+            if st.button("🗑️ Delete Selected Logs", key="btn_delete_selected_logs", type="primary"):
+                ids_to_delete = [option_to_id[lbl] for lbl in selected_labels]
+                with st.spinner("Deleting selected logs..."):
+                    try:
+                        delete_attendance_logs(ids_to_delete)
+                        st.success(f"Successfully deleted {len(ids_to_delete)} logs!")
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete logs: {e}")
+                        
+        st.markdown("<hr style='margin: 20px 0;'>", unsafe_allow_html=True)
+        st.markdown("#### Clear All Logs")
+        st.warning("⚠️ Warning: This will permanently delete all attendance logs for this class.")
+        confirm_clear = st.checkbox("I confirm that I want to delete all attendance logs for this class.", key="confirm_clear_all_logs")
+        if st.button("🚨 Clear All Logs", key="btn_clear_all_logs", type="primary", disabled=not confirm_clear):
+            with st.spinner("Clearing all logs for this class..."):
+                try:
+                    clear_attendance_logs_by_subject(subject_id)
+                    st.success("Successfully deleted all attendance logs for this class!")
+                    time.sleep(1)
+                    st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to clear logs: {e}")
 
 def render_auth_flow():
     _, col_form, _ = st.columns([1, 3.5, 1])
