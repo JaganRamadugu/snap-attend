@@ -111,5 +111,15 @@ def get_students_by_subject(subject_id):
             students.append(item['students'])
     return students
 
+def delete_subject(subject_id):
+    # 1. Delete dependent attendance logs
+    supabase.table('attendance_logs').delete().eq('subject_id', subject_id).execute()
+    # 2. Delete dependent student enrollments
+    supabase.table('subject_students').delete().eq('subject_id', subject_id).execute()
+    # 3. Delete the subject itself
+    response = supabase.table('subjects').delete().eq('subject_id', subject_id).execute()
+    return response.data
+
+
 
 

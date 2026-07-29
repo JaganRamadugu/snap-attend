@@ -18,7 +18,8 @@ from src.database.db import (
     get_attendance_reports, 
     get_students_by_subject,
     delete_attendance_logs,
-    clear_attendance_logs_by_subject
+    clear_attendance_logs_by_subject,
+    delete_subject
 )
 from src.pipelines.face_pipeline import predict_attendance
 
