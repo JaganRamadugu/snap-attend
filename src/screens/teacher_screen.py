@@ -115,6 +115,10 @@ def render_teacher_dashboard():
         st.session_state['teacher_logged_in'] = False
         st.session_state['teacher_user'] = None
         st.session_state['teacher_view'] = 'dashboard'
+        st.session_state['teacher_mode'] = 'login'
+        st.session_state['scanner_photos'] = []
+        st.session_state['detection_results'] = None
+        st.session_state['saved_disk_paths'] = []
         st.rerun()
 
     # Footer Branding
@@ -637,66 +641,65 @@ def render_auth_flow():
         if st.session_state['teacher_mode'] == 'register':
             st.markdown('<h1 style="text-align: center; font-family: \'Plus Jakarta Sans\', sans-serif; font-size: 2.3rem; font-weight: 800; color: #0E1428; margin-top: 15px; margin-bottom: 25px;">Register your teacher profile</h1>', unsafe_allow_html=True)
             
-            username = st.text_input("Enter username", placeholder="@abhishek", key="reg_username")
-            name = st.text_input("Enter name", placeholder="Abhishek Sharma", key="reg_name")
-
-            password = st.text_input("Enter password", type="password", placeholder="Enter your password", key="reg_password")
-            confirm_password = st.text_input("Confirm password", type="password", placeholder="Confirm your password", key="reg_confirm_password")
-            
-            st.write("")
-            
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                if st.button("👤+ Register Now ⌘ + Enter", key="btn_register", type="primary", width="stretch"):
-                    if not username or not name or not password or not confirm_password:
-                        st.error("Please fill in all fields.")
-                    elif password != confirm_password:
-                        st.error("Passwords do not match.")
+            with st.form("register_form", clear_on_submit=False):
+                username = st.text_input("Enter username", placeholder="@abhishek", key="reg_username")
+                name = st.text_input("Enter name", placeholder="Abhishek Sharma", key="reg_name")
+                password = st.text_input("Enter password", type="password", placeholder="Enter your password", key="reg_password")
+                confirm_password = st.text_input("Confirm password", type="password", placeholder="Confirm your password", key="reg_confirm_password")
+                
+                st.write("")
+                submit_register = st.form_submit_button("👤+ Register Now", type="primary", use_container_width=True)
+                
+            if submit_register:
+                if not username or not name or not password or not confirm_password:
+                    st.error("Please fill in all fields.")
+                elif password != confirm_password:
+                    st.error("Passwords do not match.")
+                else:
+                    if check_teacher_exists(username):
+                        st.error("Username already exists. Please choose a different username.")
                     else:
-                        if check_teacher_exists(username):
-                            st.error("Username already exists. Please choose a different username.")
-                        else:
-                            try:
-                                create_teacher(username, password, name)
-                                st.success(f"Teacher profile registered successfully for {name}!")
-                                st.session_state['teacher_mode'] = 'login'
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Failed to register teacher: {e}")
+                        try:
+                            create_teacher(username, password, name)
+                            st.success(f"Teacher profile registered successfully for {name}!")
+                            st.session_state['teacher_mode'] = 'login'
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Failed to register teacher: {e}")
                         
-            with col_btn2:
-                if st.button("👤 Login instead", key="btn_login_instead", type="secondary", width="stretch"):
-                    st.session_state['teacher_mode'] = 'login'
-                    st.rerun()
+            st.write("")
+            if st.button("👤 Login instead", key="btn_login_instead", type="secondary", width="stretch"):
+                st.session_state['teacher_mode'] = 'login'
+                st.rerun()
                     
         else:
             st.markdown('<h1 style="text-align: center; font-family: \'Plus Jakarta Sans\', sans-serif; font-size: 2.3rem; font-weight: 800; color: #0E1428; margin-top: 15px; margin-bottom: 25px;">Login to your teacher profile</h1>', unsafe_allow_html=True)
             
-            username = st.text_input("Enter username", placeholder="@abhishek", key="login_username")
-            password = st.text_input("Enter password", type="password", placeholder="Enter your password", key="login_password")
-            
-            st.write("")
-            
-            col_btn1, col_btn2 = st.columns(2)
-            with col_btn1:
-                if st.button("🔑 Login Now ⌘ + Enter", key="btn_login", type="primary", width="stretch"):
-                    if not username or not password:
-                        st.error("Please enter both username and password.")
+            with st.form("login_form", clear_on_submit=False):
+                username = st.text_input("Enter username", placeholder="@abhishek", key="login_username")
+                password = st.text_input("Enter password", type="password", placeholder="Enter your password", key="login_password")
+                
+                st.write("")
+                submit_login = st.form_submit_button("🔑 Login Now", type="primary", use_container_width=True)
+                
+            if submit_login:
+                if not username or not password:
+                    st.error("Please enter both username and password.")
+                else:
+                    teacher = teacher_login(username, password)
+                    if teacher:
+                        st.session_state['teacher_logged_in'] = True
+                        st.session_state['teacher_user'] = teacher
+                        st.session_state['teacher_view'] = 'dashboard'
+                        st.success(f"Welcome back, {teacher.get('name', username)}!")
+                        st.rerun()
                     else:
-                        teacher = teacher_login(username, password)
-                        if teacher:
-                            st.session_state['teacher_logged_in'] = True
-                            st.session_state['teacher_user'] = teacher
-                            st.session_state['teacher_view'] = 'dashboard'
-                            st.success(f"Welcome back, {teacher.get('name', username)}!")
-                            st.rerun()
-                        else:
-                            st.error("Invalid username or password.")
+                        st.error("Invalid username or password.")
                         
-            with col_btn2:
-                if st.button("👤+ Register instead", key="btn_register_instead", type="secondary", width="stretch"):
-                    st.session_state['teacher_mode'] = 'register'
-                    st.rerun()
+            st.write("")
+            if st.button("👤+ Register instead", key="btn_register_instead", type="secondary", width="stretch"):
+                st.session_state['teacher_mode'] = 'register'
+                st.rerun()
 
     # Footer Branding
     st.markdown("""
