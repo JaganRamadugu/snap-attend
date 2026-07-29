@@ -172,6 +172,31 @@ def render_classes_view():
             df = df[['subject_id', 'subject_code', 'name', 'section']]
             df.columns = ['ID', 'Code', 'Subject Name', 'Section']
             st.dataframe(df, width="stretch", hide_index=True)
+            
+            st.write("")
+            st.markdown("<h4 style='color: #0E1428; font-weight: 700; margin-top: 20px;'>🗑️ Delete a Class</h4>", unsafe_allow_html=True)
+            
+            class_to_delete = st.selectbox(
+                "Select Class to Delete",
+                options=subjects,
+                format_func=lambda s: f"{s['subject_code']} - {s['name']} (Sec {s['section']})",
+                key="delete_class_selectbox"
+            )
+            
+            confirm_del = st.checkbox(
+                f"I confirm that I want to delete this class and all associated logs & enrollments.",
+                key="confirm_delete_class_checkbox"
+            )
+            
+            if st.button("🗑️ Delete Selected Class", type="primary", disabled=not confirm_del, key="btn_delete_class", width="stretch"):
+                with st.spinner("Deleting class..."):
+                    try:
+                        delete_subject(class_to_delete['subject_id'])
+                        st.success(f"Class deleted successfully!")
+                        time.sleep(1)
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Failed to delete class: {e}")
 
 def render_qr_view():
     teacher = st.session_state.get('teacher_user', {})
