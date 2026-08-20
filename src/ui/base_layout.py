@@ -1,6 +1,17 @@
+"""
+ATTENDX AI - Base Layout Styles
+
+This module defines styling templates, global typography rules, custom color palettes,
+and card CSS hover configurations injected dynamically into Streamlit pages.
+"""
+
 import streamlit as st
 
 def style_background_home():
+    """
+    Applies custom styling and a dark navy background (#0E1428) specifically for
+    the home landing page, including CSS for hover effects and footer animations.
+    """
     
     st.markdown("""
         <style>
@@ -116,6 +127,10 @@ def style_background_home():
 
     
 def style_background_dashboard():
+    """
+    Applies a soft light-blue theme background (#E0E3FF) specifically for
+    the internal teacher/student portal dashboard views.
+    """
     
     st.markdown("""
         <style>
@@ -127,6 +142,11 @@ def style_background_dashboard():
 
 
 def style_base_layout():
+    """
+    Injects global base layout configurations, including custom Google Fonts (Inter,
+    Plus Jakarta Sans, JetBrains Mono), hidden default Streamlit headers/footers,
+    custom form-input layouts, and interactive password-toggle visual updates.
+    """
     
     st.markdown("""
         <style>

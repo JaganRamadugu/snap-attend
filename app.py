@@ -1,3 +1,11 @@
+"""
+ATTENDX AI - Main Application Entrypoint
+
+This module initializes the Streamlit session state parameters and manages
+the primary routing logic to display the Home, Teacher, or Student screens
+based on query parameters or UI selections.
+"""
+
 import streamlit as st
 
 from src.screens.home_screen import home_screen
@@ -6,6 +14,11 @@ from src.screens.student_screen import student_screen
 
 
 def init_session():
+    """
+    Initializes all necessary Streamlit session state keys.
+    Ensures safe default values exist for routing, teacher authentication,
+    and camera/scanner pipeline states to prevent KeyErrors during rendering.
+    """
     # Page / routing states
     if 'login_type' not in st.session_state:
         st.session_state['login_type'] = None
@@ -30,6 +43,10 @@ def init_session():
 
 
 def main():
+    """
+    Primary application driver. Configures session state parameters,
+    resolves routing queries from URL parameters, and renders the corresponding view.
+    """
     init_session()
     
     # Read query parameters for auto-routing/context
@@ -37,6 +54,7 @@ def main():
     if 'login_type' in query_params:
         st.session_state['login_type'] = query_params['login_type']
     
+    # Route to screen based on active login context
     match st.session_state['login_type']:
         case 'teacher':
             teacher_screen()
@@ -46,5 +64,7 @@ def main():
             home_screen()
 
 
-main()
+if __name__ == "__main__":
+    main()
+
 

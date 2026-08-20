@@ -1,3 +1,11 @@
+"""
+ATTENDX AI - Teacher Screen Control Center
+
+Implements the teacher dashboard, classroom registration, dynamic check-in QR-code
+generation, AI group-facial-biometric scanning workspace, and course attendance report
+spreadsheets export views.
+"""
+
 import streamlit as st
 import io
 import os
@@ -24,6 +32,10 @@ from src.database.db import (
 from src.pipelines.face_pipeline import predict_attendance
 
 def teacher_screen():
+    """
+    Renders the entry portal for teachers. Manages routing transitions between the
+    dashboard, class configuration, QR session generator, scanner interface, and authentication flow.
+    """
     style_background_dashboard()
     style_base_layout()
     
@@ -55,6 +67,11 @@ def teacher_screen():
         render_auth_flow()
 
 def render_teacher_dashboard():
+    """
+    Renders the main central menu dashboard for logged-in teachers.
+    Provides direct access controls to trigger scanner workspace, reports exports, 
+    class config forms, QR generation views, and user logout triggers.
+    """
     teacher = st.session_state.get('teacher_user', {})
     teacher_name = teacher.get('name', 'Teacher')
     
@@ -130,6 +147,10 @@ def render_teacher_dashboard():
     """, unsafe_allow_html=True)
 
 def render_classes_view():
+    """
+    Renders the Class & Cohort management panel. Allows teachers to configure
+    new subject models, list currently active courses, and delete unwanted classes.
+    """
     teacher = st.session_state.get('teacher_user', {})
     teacher_id = teacher.get('teacher_id')
     
@@ -199,6 +220,11 @@ def render_classes_view():
                         st.error(f"Failed to delete class: {e}")
 
 def render_qr_view():
+    """
+    Renders the Dynamic QR Session Generator. Generates temporary QR codes
+    encoding the subject ID and the server IP/host context to allow students on the local
+    network to scan and open the Student biometric setup page directly.
+    """
     teacher = st.session_state.get('teacher_user', {})
     teacher_id = teacher.get('teacher_id')
     
@@ -276,6 +302,10 @@ def render_qr_view():
         """, unsafe_allow_html=True)
 
 def cleanup_old_uploads():
+    """
+    Deletes temporary image uploads older than 24 hours from the disk space
+    to conserve server memory.
+    """
     uploads_dir = "uploads"
     if not os.path.exists(uploads_dir):
         return
@@ -292,6 +322,16 @@ def cleanup_old_uploads():
                 pass
 
 def save_photo_to_disk(photo_bytes, photo_name):
+    """
+    Saves an uploaded raw image file to the server's uploads folder.
+
+    Args:
+        photo_bytes (bytes): The raw image binary payload.
+        photo_name (str): Original filename to sanitize and store.
+
+    Returns:
+        str | None: Absolute file path if save succeeded, otherwise None.
+    """
     uploads_dir = "uploads"
     if not os.path.exists(uploads_dir):
         os.makedirs(uploads_dir, exist_ok=True)
@@ -307,6 +347,11 @@ def save_photo_to_disk(photo_bytes, photo_name):
         return None
 
 def render_scanner_view():
+    """
+    Renders the group biometric face scanning workspace. Teachers can capture/upload
+    up to 3 photos of the classroom. The facial recognition model detects student faces,
+    matches them against enrolled templates, and logs their attendance automatically.
+    """
     cleanup_old_uploads()
     teacher = st.session_state.get('teacher_user', {})
     teacher_id = teacher.get('teacher_id')
@@ -508,6 +553,10 @@ def render_scanner_view():
                     st.error(f"Failed to log attendance: {e}")
 
 def render_reports_view():
+    """
+    Renders the attendance query reports dashboard. Displays attendance counts,
+    chronological presence logs, and options to export spreadsheet (CSV/Excel) data.
+    """
     teacher = st.session_state.get('teacher_user', {})
     teacher_id = teacher.get('teacher_id')
     
@@ -661,6 +710,10 @@ def render_reports_view():
                     st.error(f"Failed to clear logs: {e}")
 
 def render_auth_flow():
+    """
+    Renders the teacher authentication views. Manages account registration
+    (username uniqueness checks and password hashing) and secure login logic.
+    """
     _, col_form, _ = st.columns([1, 3.5, 1])
 
     with col_form:
