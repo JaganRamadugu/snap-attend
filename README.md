@@ -1,5 +1,8 @@
 # AttendX AI 📚✨
 
+> 🚀 **Live Demo:** Access the live deployed application at **[https://snap-attend-jr.streamlit.app/](https://snap-attend-jr.streamlit.app/)**
+
+[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://snap-attend-jr.streamlit.app/)
 [![Python Version](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Framework](https://img.shields.io/badge/framework-Streamlit-FF4B4B.svg)](https://streamlit.io/)
 [![Database](https://img.shields.io/badge/database-Supabase--Postgres-3ECF8E.svg)](https://supabase.com/)
