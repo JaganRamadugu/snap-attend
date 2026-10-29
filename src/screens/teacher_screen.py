@@ -735,16 +735,16 @@ def render_auth_flow():
                 elif password != confirm_password:
                     st.error("Passwords do not match.")
                 else:
-                    if check_teacher_exists(username):
-                        st.error("Username already exists. Please choose a different username.")
-                    else:
-                        try:
+                    try:
+                        if check_teacher_exists(username):
+                            st.error("Username already exists. Please choose a different username.")
+                        else:
                             create_teacher(username, password, name)
                             st.success(f"Teacher profile registered successfully for {name}!")
                             st.session_state['teacher_mode'] = 'login'
                             st.rerun()
-                        except Exception as e:
-                            st.error(f"Failed to register teacher: {e}")
+                    except Exception as e:
+                        st.error(f"❌ Database connection error: Unable to reach Supabase ({e}). Please verify that your Supabase project is active and that your URL and keys are configured correctly.")
                         
             st.write("")
             if st.button("👤 Login instead", key="btn_login_instead", type="secondary", width="stretch"):
@@ -765,15 +765,18 @@ def render_auth_flow():
                 if not username or not password:
                     st.error("Please enter both username and password.")
                 else:
-                    teacher = teacher_login(username, password)
-                    if teacher:
-                        st.session_state['teacher_logged_in'] = True
-                        st.session_state['teacher_user'] = teacher
-                        st.session_state['teacher_view'] = 'dashboard'
-                        st.success(f"Welcome back, {teacher.get('name', username)}!")
-                        st.rerun()
-                    else:
-                        st.error("Invalid username or password.")
+                    try:
+                        teacher = teacher_login(username, password)
+                        if teacher:
+                            st.session_state['teacher_logged_in'] = True
+                            st.session_state['teacher_user'] = teacher
+                            st.session_state['teacher_view'] = 'dashboard'
+                            st.success(f"Welcome back, {teacher.get('name', username)}!")
+                            st.rerun()
+                        else:
+                            st.error("Invalid username or password.")
+                    except Exception as e:
+                        st.error(f"❌ Database connection error: Unable to reach Supabase ({e}). Please check your Supabase project status.")
                         
             st.write("")
             if st.button("👤+ Register instead", key="btn_register_instead", type="secondary", width="stretch"):

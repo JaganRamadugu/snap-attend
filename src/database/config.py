@@ -73,7 +73,7 @@ def get_secret(key):
 
 # Load API endpoint and authorization keys
 supabase_url = get_secret("SUPABASE_URL")
-supabase_key = get_secret("SUPABASE_PUBLISHABLE_KEY")
+supabase_key = get_secret("SUPABASE_PUBLISHABLE_KEY") or get_secret("SUPABASE_KEY") or get_secret("SUPABASE_ANON_KEY")
 
 if not supabase_url or not supabase_key:
     raise ValueError(
